@@ -1,0 +1,38 @@
+version: '3'
+services:
+
+#nginx-1
+  nginx-1:
+    container_name: nginx-1
+    image: nginx:latest
+    ports:
+      - 80:80
+    volumes:
+      # - loki-nginx-log-1:/var/log/nginx
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./nginx/conf/defaut.conf:/etc/nginx/conf.d/default.conf:cache
+      - ./nginx/conf/nginx.conf:/etc/nginx/nginx.conf
+
+#telegraf
+  telegraf:
+    container_name: telegraf
+    # image: telegraf:latest
+    build: telegraf
+    volumes:
+      # - loki-nginx-log-1:/var/log/nginx-1:cache
+      - ./telegraf.conf:/etc/telegraf/telegraf.conf
+      - ./log.out:/tmp/log.out
+    depends_on:
+      - nginx-1
+      - loki
+
+#loki
+  loki:
+    container_name: loki
+    image: grafana/loki:latest
+    ports:
+      - 3100:3100
+    command: -config.file=/etc/loki/local-config.yaml    
+
+# volumes:
+  # loki-nginx-log-1:
