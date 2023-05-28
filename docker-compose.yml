@@ -1,35 +1,45 @@
 version: '3'
 services:
 
-#nginx-1
+# nginx-1
   nginx-1:
     container_name: nginx-1
     image: nginx:latest
     ports:
       - 80:80
     volumes:
-      # - loki-nginx-log-1:/var/log/nginx
-      # - /var/run/docker.sock:/var/run/docker.sock
-      - ./nginx/conf/defaut.conf:/etc/nginx/conf.d/default.conf:cache
+      - ./nginx/conf/defaut.conf:/etc/nginx/conf.d/default.conf
       - ./nginx/conf/nginx.conf:/etc/nginx/nginx.conf
 
-#telegraf
-  telegraf:
-    container_name: telegraf
+# telegraf node 1 Log for Loki
+  telegraf-loki:
+    container_name: telegraf-loki
     image: telegraf:1.26.3
     # build: telegraf
     volumes:
-      # - loki-nginx-log-1:/var/log/nginx-1:cache
-      - ./test:/var/log/test # test input file
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./telegraf/telegraf.d:/etc/telegraf/telegraf.d
-      - ./telegraf/conf/telegraf.conf:/etc/telegraf/telegraf.conf
+      - ./test:/var/log/test # test input file
+      - ./telegraf/conf/telegraf.loki.conf:/etc/telegraf/telegraf.conf
       - ./log.out:/tmp/log.out
     depends_on:
       - nginx-1
       - loki
 
-#loki
+# telegraf node 2 Metrics for Victoriametrics
+  telegraf:
+    container_name: telegraf-vm
+    image: telegraf:1.26.3
+    # build: telegraf
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./test:/var/log/test # test input file
+      - ./telegraf/conf/telegraf.vm.conf:/etc/telegraf/telegraf.conf
+      - ./log.out:/tmp/log.out
+    depends_on:
+      - nginx-1
+      - victoriametrics
+
+# loki
   loki:
     container_name: loki
     image: grafana/loki:2.8.2
@@ -39,7 +49,19 @@ services:
       - loki-data:/loki
     command: -config.file=/etc/loki/local-config.yaml    
 
+# victoriametrics
+  victoriametrics:
+    container_name: victoriametrics
+    image: victoriametrics/victoria-metrics:v1.91.0
+    ports:
+      - 8428:8428
+    volumes:
+      - victoriametrics_data:/victoria-metrics-data
+    command: -storageDataPath /victoria-metrics-data
+
+# grafana
   grafana:
+    container_name: grafana
     image: grafana/grafana:latest
     ports:
       - "3000:3000"
@@ -66,5 +88,7 @@ services:
           editable: false
         EOF
         /run.sh
+
 volumes:
   loki-data:
+  victoriametrics_data:
