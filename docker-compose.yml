@@ -26,7 +26,7 @@ services:
       - loki
 
 # telegraf node 2 Metrics for Victoriametrics
-  telegraf:
+  telegraf-vm:
     container_name: telegraf-vm
     image: telegraf:1.26.3
     # build: telegraf
@@ -89,6 +89,42 @@ services:
         EOF
         /run.sh
 
+
+  vmalert:
+    container_name: vmalert
+    image: victoriametrics/vmalert:v1.91.0
+    depends_on:
+      - "victoriametrics"
+      - "alertmanager"
+    ports:
+      - 8880:8880
+    volumes:
+      - ./alerts.yml:/etc/alerts/alerts.yml
+      - ./alerts-health.yml:/etc/alerts/alerts-health.yml
+      - ./alerts-vmagent.yml:/etc/alerts/alerts-vmagent.yml
+      - ./alerts-vmalert.yml:/etc/alerts/alerts-vmalert.yml
+    command:
+      - "--datasource.url=http://victoriametrics:8428/"
+      - "--remoteRead.url=http://victoriametrics:8428/"
+      - "--remoteWrite.url=http://victoriametrics:8428/"
+      - "--notifier.url=http://alertmanager:9093/"
+      - "--rule=/etc/alerts/*.yml"
+      # display source of alerts in grafana
+      - "--external.url=http://127.0.0.1:3000" #grafana outside container
+      # when copypaste the line be aware of '$$' for escaping in '$expr'
+      - '--external.alert.source=explore?orgId=1&left={"datasource":"VictoriaMetrics","queries":[{"expr":{{$$expr|jsonEscape|queryEscape}},"refId":"A"}],"range":{"from":"now-1h","to":"now"}}'
+
+
+  alertmanager:
+    container_name: alertmanager
+    image: prom/alertmanager:v0.25.0
+    volumes:
+      - ./alertmanager.yml:/config/alertmanager.yml
+    command:
+      - "--config.file=/config/alertmanager.yml"
+    ports:
+      - 9093:9093
+      
 volumes:
   loki-data:
   victoriametrics_data:
